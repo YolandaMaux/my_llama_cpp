@@ -1,0 +1,38 @@
+# NVIDIA GeForce GTX TITAN X (Maxwell, SM 5.2) llama.cpp build.
+ARG CUDA_IMAGE_TAG=12.4.1
+ARG LLAMACPP_REF=master
+FROM docker.io/nvidia/cuda:${CUDA_IMAGE_TAG}-devel-ubuntu22.04 AS builder
+ARG LLAMACPP_REF
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git cmake build-essential ca-certificates libgomp1 && \
+    rm -rf /var/lib/apt/lists/*
+# The build container has the CUDA toolkit but no real GPU driver, so the
+# driver-API symbols ggml-cuda needs (cuMemCreate, cuDeviceGet, etc.) must
+# be resolved against the stub libcuda.so shipped with the toolkit. The
+# stub lacks the versioned .so.1 the linker expects, so symlink it in and
+# register the stub directory with ldconfig.
+RUN ln -s /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/stubs/libcuda.so.1 \
+    && echo /usr/local/cuda/lib64/stubs > /etc/ld.so.conf.d/cuda-stubs.conf \
+    && ldconfig
+WORKDIR /src
+RUN git clone --depth=1 --branch "${LLAMACPP_REF}" https://github.com/ggml-org/llama.cpp.git .
+RUN cmake -S . -B build \
+      -DGGML_CUDA=ON \
+      -DCMAKE_CUDA_ARCHITECTURES=52 \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_EXE_LINKER_FLAGS="-L/usr/local/cuda/lib64/stubs -Wl,-rpath-link,/usr/local/cuda/lib64/stubs" \
+      -DCMAKE_SHARED_LINKER_FLAGS="-L/usr/local/cuda/lib64/stubs -Wl,-rpath-link,/usr/local/cuda/lib64/stubs" \
+    && cmake --build build --config Release -j"$(nproc)" --target llama-server
+
+FROM docker.io/nvidia/cuda:${CUDA_IMAGE_TAG}-runtime-ubuntu22.04
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates libgomp1 wget && \
+    rm -rf /var/lib/apt/lists/*
+COPY --from=builder /src/build/bin/llama-server /usr/local/bin/llama-server
+COPY --from=builder /src/build/bin/*.so* /usr/local/lib/
+RUN ldconfig
+ENV LLAMA_ARG_HOST=0.0.0.0 \
+    LLAMA_ARG_PORT=8080
+EXPOSE 8080
+ENTRYPOINT ["/usr/local/bin/llama-server"]

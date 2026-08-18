@@ -1,0 +1,14 @@
+# Local configuration (never commit)
+
+llamacpp.secrets.env
+
+# Large model weights
+models/
+*.gguf
+
+# Runtime/editor output
+logs/
+.vscode/
+.idea/
+__pycache__/
+.DS_Store

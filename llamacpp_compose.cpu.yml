@@ -1,0 +1,37 @@
+services:
+  llamacpp:
+    container_name: llamacpp
+    restart: unless-stopped
+    stop_signal: SIGTERM
+    stop_grace_period: 30s
+    env_file:
+      - ./llamacpp.env
+      - ./llamacpp.secrets.env
+    ports:
+      - "${LLAMACPP_PORT}:8080"
+    volumes:
+      - "${MODELS_DIR:?Set MODELS_DIR in llamacpp.env}:/models:ro,Z"
+      - "./llamacpp_models.ini:${MODELS_INI_CONTAINER_PATH:?Set MODELS_INI_CONTAINER_PATH in llamacpp.env}:ro,Z"
+    environment:
+      LLAMA_ARG_HOST: 0.0.0.0
+      LLAMA_ARG_PORT: 8080
+      LLAMA_ARG_MODELS_PRESET: ${MODELS_INI_CONTAINER_PATH}
+      LLAMA_ARG_MODELS_MAX: ${LLAMA_ARG_MODELS_MAX}
+      LLAMA_ARG_N_GPU_LAYERS: ${LLAMA_ARG_N_GPU_LAYERS}
+      LLAMA_ARG_CTX_SIZE: ${LLAMA_ARG_CTX_SIZE}
+      LLAMA_ARG_PARALLEL: ${LLAMA_ARG_PARALLEL}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -T 5 -O /dev/null http://127.0.0.1:8080/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    image: llamacpp-router:cpu
+    build:
+      context: .
+      dockerfile: llamacpp_Dockerfile.cpu
