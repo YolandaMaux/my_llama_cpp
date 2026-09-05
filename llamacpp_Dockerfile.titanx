@@ -27,7 +27,7 @@ RUN cmake -S . -B build \
 
 FROM docker.io/nvidia/cuda:${CUDA_IMAGE_TAG}-runtime-ubuntu22.04
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates libgomp1 wget && \
+    ca-certificates libgomp1 wget ffmpeg && \
     rm -rf /var/lib/apt/lists/*
 COPY --from=builder /src/build/bin/llama-server /usr/local/bin/llama-server
 COPY --from=builder /src/build/bin/*.so* /usr/local/lib/

@@ -9,6 +9,10 @@ services:
       - ./llamacpp.secrets.env
     ports:
       - "${LLAMACPP_PORT}:8080"
+    networks:
+      - default
+      - llm_backend
+          
     volumes:
       - "${MODELS_DIR:?Set MODELS_DIR in llamacpp.env}:/models:ro,Z"
       - "./llamacpp_models.ini:${MODELS_INI_CONTAINER_PATH:?Set MODELS_INI_CONTAINER_PATH in llamacpp.env}:ro,Z"
@@ -51,3 +55,9 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
+networks:
+  default:
+    driver: bridge
+
+  llm_backend:
+    driver: bridge
